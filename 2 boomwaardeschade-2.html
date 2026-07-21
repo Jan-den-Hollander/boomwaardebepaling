@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Boomschade">
+<meta name="theme-color" content="#161a15">
+<link rel="manifest" id="bwManifestLink">
+<link rel="icon" id="bwFavicon">
+<link rel="apple-touch-icon" id="bwAppleIcon">
+<title>Boomwaarde &amp; Schadeberekening</title>
+<meta name="description" content="Rekentool boomwaarde- en schadebepaling na aanrijding of illegale kap, volgens de Nederlandse boomtaxatiemethode. Werkt offline.">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script>
+(function() {
+  try {
+    var svgIcoon =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">' +
+      '<defs><clipPath id="schild"><path d="M100 8 L182 30 V95 C182 145 148 178 100 194 C52 178 18 145 18 95 V30 Z"/></clipPath></defs>' +
+      '<g clip-path="url(#schild)">' +
+      '<rect x="0" y="0" width="200" height="100" fill="#0057B7"/>' +
+      '<rect x="0" y="100" width="200" height="100" fill="#FFD700"/>' +
+      '</g>' +
+      '<path d="M100 8 L182 30 V95 C182 145 148 178 100 194 C52 178 18 145 18 95 V30 Z" fill="none" stroke="#14331f" stroke-width="7"/>' +
+      '<circle cx="100" cy="80" r="32" fill="#1b4d2e"/>' +
+      '<circle cx="74" cy="100" r="24" fill="#1b4d2e"/>' +
+      '<circle cx="126" cy="100" r="24" fill="#1b4d2e"/>' +
+      '<circle cx="100" cy="112" r="28" fill="#1b4d2e"/>' +
+      '<rect x="91" y="118" width="18" height="48" rx="4" fill="#5b3a20"/>' +
+      '</svg>';
+    var svgBase64 = btoa(unescape(encodeURIComponent(svgIcoon)));
+    var iconDataUrl = 'data:image/svg+xml;base64,' + svgBase64;
+
+    var faviconEl = document.getElementById('bwFavicon');
+    if (faviconEl) faviconEl.href = iconDataUrl;
+    var appleIconEl = document.getElementById('bwAppleIcon');
+    if (appleIconEl) appleIconEl.href = iconDataUrl;
+
+    var manifest = {
+      name: 'Boomwaarde & Schadeberekening',
+      short_name: 'Boomschade',
+      description: 'Boomwaarde- en schadebepaling volgens de Nederlandse boomtaxatiemethode.',
+      start_url: '.',
+      scope: '.',
+      display: 'standalone',
+      orientation: 'portrait',
+      background_color: '#161a15',
+      theme_color: '#161a15',
+      icons: [
+        { src: iconDataUrl, sizes: '192x192', type: 'image/svg+xml', purpose: 'any' },
+        { src: iconDataUrl, sizes: '512x512', type: 'image/svg+xml', purpose: 'any' },
+        { src: iconDataUrl, sizes: '512x512', type: 'image/svg+xml', purpose: 'maskable' }
+      ]
+    };
+    var manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+    var manifestUrl = URL.createObjectURL(manifestBlob);
+    var manifestEl = document.getElementById('bwManifestLink');
+    if (manifestEl) manifestEl.href = manifestUrl;
+
+    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+      var swCode =
+        "const CACHE='boomschade-cache-v1';" +
+        "self.addEventListener('install',e=>{self.skipWaiting();});" +
+        "self.addEventListener('activate',e=>{self.clients.claim();});" +
+        "self.addEventListener('fetch',e=>{" +
+        "  if(e.request.method!=='GET')return;" +
+        "  e.respondWith(caches.open(CACHE).then(cache=>cache.match(e.request).then(cached=>{" +
+        "    const net=fetch(e.request).then(r=>{if(r&&r.ok)cache.put(e.request,r.clone());return r;}).catch(()=>cached);" +
+        "    return cached||net;" +
+        "  })));" +
+        "});";
+      var swBlob = new Blob([swCode], { type: 'application/javascript' });
+      navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(function(e){ console.error('SW registratie mislukt:', e); });
+    }
+  } catch (e) { console.error('PWA-setup fout:', e); }
+})();
+</script><style>:root{--bg:#161a15;--bg2:#1e241c;--panel:#212820;--line:#3a4536;--ink:#eef0e8;--ink-dim:#a8b39c;--accent:#8fae5c;--accent2:#c7943f;--danger:#c76a4f;--ok:#6ea87d;--mono:'IBM Plex Mono',ui-monospace,Consolas,monospace;--serif:'Fraunces',Georgia,serif}*{box-sizing:border-box}html,body{margin:0;padding:0}body{background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:15px;line-height:1.5;padding-bottom:70px}h1,h2,h3{font-family:var(--serif);font-weight:600;letter-spacing:.2px;margin:0 0 .4em}h1{font-size:1.4rem}h2{font-size:1.15rem;color:var(--accent)}h3{font-size:1rem;color:var(--ink-dim);font-weight:500}a{color:var(--accent2)}header.top{padding:20px 18px 14px;border-bottom:1px solid var(--line);background:var(--bg2);position:sticky;top:0;z-index:20}header.top .brandrow{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}header.top .brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}header.top p{margin:6px 0 0;color:var(--ink-dim);font-size:.85rem}.langtoggle{display:flex;gap:4px}.langtoggle button{background:transparent;border:1px solid var(--line);border-radius:7px;padding:5px 9px;font-size:1.05rem;cursor:pointer;line-height:1}.langtoggle button.active{border-color:var(--accent);background:var(--bg)}nav.tabs{display:flex;gap:6px;margin-top:14px;flex-wrap:wrap}nav.tabs button{background:transparent;border:1px solid var(--line);color:var(--ink-dim);font-family:var(--mono);padding:8px 14px;border-radius:7px;cursor:pointer;font-size:.85rem}nav.tabs button.active{background:var(--accent);color:#131810;border-color:var(--accent);font-weight:600}main{max-width:760px;margin:0 auto;padding:20px 16px}.view{display:none}.view.active{display:block}.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 16px;margin-bottom:16px}.field{margin-bottom:14px}.field label{display:block;font-size:.78rem;color:var(--ink-dim);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}.field .hint{font-size:.75rem;color:var(--ink-dim);margin-top:4px}input[type=text],input[type=number],select,textarea{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--ink);padding:9px 10px;border-radius:6px;font-family:var(--mono);font-size:.95rem}input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:1px}.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:520px){.row2{grid-template-columns:1fr}}button.btn{background:var(--accent);color:#131810;border:none;padding:10px 16px;border-radius:7px;font-family:var(--mono);font-weight:600;cursor:pointer;font-size:.9rem}button.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}button.btn.small{padding:6px 10px;font-size:.8rem;margin-right:6px;margin-top:6px}button.btn.danger{background:var(--danger);color:#1c110d}table.calc{width:100%;border-collapse:collapse;font-size:.85rem;margin:8px 0}table.calc td,table.calc th{padding:5px 6px;border-bottom:1px solid var(--line);text-align:left}table.calc td:last-child,table.calc th:last-child{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}table.calc tr.sub td{color:var(--ink-dim)}table.calc tr.total td{font-weight:700;border-top:1px solid var(--accent);color:var(--accent)}table.calc input[type=number]{width:80px;text-align:right;padding:4px 6px;font-size:.82rem}.badge{display:inline-block;font-size:.72rem;padding:2px 8px;border-radius:20px;border:1px solid var(--line);color:var(--ink-dim)}.flow{display:flex;flex-direction:column;gap:0}.flow .step{border:1px solid var(--line);border-radius:9px;padding:12px 14px;background:var(--bg2);position:relative}.flow .arrow{text-align:center;color:var(--accent);font-size:1.1rem;padding:4px 0}.flow .step h3{color:var(--ink);margin-bottom:2px}.flow .step p{margin:4px 0 0;color:var(--ink-dim);font-size:.86rem}.branchwrap{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media(max-width:520px){.branchwrap{grid-template-columns:1fr}}.branch{border:1px dashed var(--line);border-radius:9px;padding:10px 12px}.branch h3{color:var(--accent2)}.chipset{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.chip{border:1px solid var(--line);background:var(--bg);color:var(--ink-dim);font-size:.78rem;padding:5px 9px;border-radius:20px;cursor:pointer}.chip.active{background:var(--accent2);color:#241505;border-color:var(--accent2);font-weight:600}.result{background:var(--bg2);border:1px solid var(--accent);border-radius:10px;padding:16px}.result .big{font-family:var(--serif);font-size:2rem;color:var(--accent)}.itemrow{display:grid;grid-template-columns:1fr 110px 34px;gap:8px;margin-bottom:8px;align-items:center}.stepnav{display:flex;justify-content:space-between;margin-top:14px}.stepper{display:flex;gap:6px;margin-bottom:14px;font-size:.78rem;color:var(--ink-dim);flex-wrap:wrap}.stepper span.on{color:var(--accent);font-weight:700}.datalist-wrap{position:relative}#soortResults{position:absolute;z-index:30;left:0;right:0;top:100%;background:var(--bg2);border:1px solid var(--line);border-radius:0 0 8px 8px;max-height:220px;overflow:auto;display:none}#soortResults div{padding:8px 10px;cursor:pointer;font-size:.88rem;border-bottom:1px solid var(--line)}#soortResults div:hover,#soortResults div.sel{background:var(--accent);color:#131810}#mapPreview{height:220px;border-radius:8px;overflow:hidden;margin-top:8px;display:none;border:1px solid var(--line);background:#2a3126}.printonly{display:none}.tarhead{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}@media print{header.top,nav.tabs,.noprint,#bwCopyFooter,#bwLicenseModal{display:none !important}body{background:#fff;color:#111;font-size:12px;padding-bottom:0}main{max-width:100%;padding:0}.panel{border:1px solid #999;background:#fff;break-inside:avoid}.printonly{display:block}table.calc td,table.calc th{border-color:#ccc}.result{border-color:#333;background:#fff}.result .big{color:#111}a{color:#111}#mapPreview{display:block !important;height:260px;border-color:#999}}#bwCopyFooter{position:fixed;bottom:0;left:0;right:0;background:rgba(22,26,21,.94);color:#b9c2ac;font-size:10.5px;text-align:center;padding:5px 8px;z-index:9999;font-family:sans-serif;letter-spacing:.3px;user-select:none;border-top:1px solid rgba(143,174,92,.35)}#bwCopyFooter span.hl{color:#8fae5c}#bwCopyFooter span.lic{color:#a8b39c;cursor:pointer;text-decoration:underline}#bwLicenseModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:99999;align-items:center;justify-content:center}#bwLicenseModal .box{background:#1e241c;color:#e0e8d8;border:1px solid #4a7c2f;border-radius:12px;max-width:480px;width:92%;padding:22px;font-family:sans-serif;font-size:13px;line-height:1.6;max-height:88vh;overflow-y:auto}#bwLicenseModal h3{color:#8fae5c;margin-top:0;font-size:15px;font-family:sans-serif}#bwLicenseModal p{margin:10px 0}#bwLicenseModal .close-btn{margin-top:14px;padding:8px 20px;background:#2d5016;color:#e0f0d0;border:1px solid #4a7c2f;border-radius:8px;cursor:pointer;font-weight:bold;font-family:sans-serif;font-size:13px}</style></head>
+<body>
+<header class="top noprint">
+<div class="brandrow">
+<div class="brand"><h1>🌳 <span data-i18n="app_title">Boomwaarde &amp; Schadeberekening</span></h1><span class="badge" data-i18n="tarief_badge">tarieven aanpasbaar</span></div>
+<div class="langtoggle" id="langToggle">
+<button data-lang="nl" title="Nederlands">🇳🇱</button>
+<button data-lang="it" title="Italiano">🇮🇹</button>
+</div>
+</div>
+<p data-i18n="app_sub">Vervangingswaarde en schadebepaling van bomen na aanrijding, illegale kap of andere schade — volgens de Nederlandse boomtaxatiemethode. Werkt volledig offline.</p>
+<nav class="tabs">
+<button data-tab="uitleg" class="active" data-i18n="tab_uitleg">Uitleg &amp; beslisboom</button>
+<button data-tab="rekentool" data-i18n="tab_rekentool">Rekentool</button>
+<button data-tab="tarieven" data-i18n="tab_tarieven">Tarieventabellen</button>
+</nav>
+</header>
+<main>
+<!-- ============ TAB: UITLEG ============ --><section id="view-uitleg" class="view active"><div class="panel"><h2 data-i18n="uitleg_h">Hoe werkt deze berekening?</h2><p data-i18n="uitleg_intro">De schade aan een boom wordt in twee fasen bepaald. Eerst wordt de <strong>boomwaarde</strong> berekend: wat zou het kosten om precies deze boom, op deze plek, opnieuw te laten opgroeien tot dezelfde staat? Daarna wordt vastgesteld welk deel van die waarde door de schade verloren is gegaan.</p></div><div class="flow"><div class="step"><h3 data-i18n="flow1_h">1 · Boom &amp; maat kiezen</h3><p data-i18n="flow1_p">Boomsoort (bepaalt prijsklasse 1–4) en de maat (stamomtrek/omvang bij aanplant) uit de tarieventabel.</p></div><div class="arrow">↓</div><div class="step"><h3 data-i18n="flow2_h">2 · Kosten van vervanging</h3><p data-i18n="flow2_p">Plantgoed + btw, aanplant/arbeid + btw, 10% aanplantgarantie, rente over de nazorgperiode, jaarlijkse nazorg- en beheerkosten.</p></div><div class="arrow">↓</div><div class="step"><h3 data-i18n="flow3_h">3 · Doorrekenen naar functievervulling</h3><p data-i18n="flow3_p">De waarde wordt met 4% rente doorgerekend naar het moment waarop de nieuwe boom dezelfde functie zou vervullen als de huidige boom (leeftijd bij functievervulling).</p></div><div class="arrow">↓</div><div class="step"><h3 data-i18n="flow4_h">4 · Afschrijven naar nu</h3><p data-i18n="flow4_p">Op basis van de huidige leeftijd t.o.v. de verwachte levensduur wordt de waarde teruggerekend naar de <strong>actuele boomwaarde vóór schade</strong> (parabolische afschrijvingscurve).</p></div><div class="arrow">↓</div><div class="step"><h3 data-i18n="flow5_h">5 · Schadetype bepalen</h3><div class="branchwrap" style="margin-top:8px"><div class="branch"><h3 data-i18n="d1_h">D1 — Vervroegde uitval</h3><p data-i18n="d1_p">De boom moet als gevolg van de schade eerder vervangen worden dan gepland. Schade = actuele boomwaarde × percentage uit de schadetabel.</p></div><div class="branch"><h3 data-i18n="d2_h">D2 — Verhoogd risico op uitval</h3><p data-i18n="d2_p">Geen directe vervanging nodig, maar wel een verhoogde kans op eerder afsterven. Schade = actuele boomwaarde × toegekend risicopercentage.</p></div></div><p style="margin-top:8px" data-i18n="d1d2_note">D1 en D2 sluiten elkaar uit — kies er hooguit één.</p></div><div class="arrow">↓</div><div class="step"><h3 data-i18n="flow6_h">6 · D3 — Functieverlies (optioneel, altijd toepasbaar)</h3><p data-i18n="flow6_p">Blijvende schade terwijl de boom in leven blijft: stam-/bastschade, wortelschade en kroonverlies, elk als percentage. Wordt toegepast op de boomwaarde die na stap 5 overblijft.</p></div><div class="arrow">↓</div><div class="step"><h3 data-i18n="flow7_h">7 · Resultaat</h3><p data-i18n="flow7_p">Totale schade + resterende boomwaarde, eventueel aangevuld met specifieke kosten. Volledig herleidbaar en printbaar als rapport voor de verzekeraar — inclusief locatie op kaart.</p></div></div><div class="panel"><h2 data-i18n="tabel_h">Schadepercentages D1/D3 — richttabel</h2><p class="hint" data-i18n="tabel_hint">Deze tabel geeft richtpercentages voor de ernst van de schade; de taxateur kiest het percentage dat het beste past en kan dit altijd handmatig aanpassen.</p><table class="calc"><tr><th data-i18n="tabel_cat">Categorie</th><th data-i18n="tabel_c1">Schade 5%–25%</th><th data-i18n="tabel_c2">Schade 25%–50%</th></tr><tr><td data-i18n="tabel_r1">Licht</td><td>1/5 <span data-i18n="deel">deel</span></td><td>1/4 <span data-i18n="deel">deel</span></td></tr><tr><td data-i18n="tabel_r2">Matig</td><td>1/4 <span data-i18n="deel">deel</span></td><td>1/2 <span data-i18n="deel">deel</span></td></tr><tr><td data-i18n="tabel_r3">Zwaar</td><td>1/2 <span data-i18n="deel">deel</span></td><td>3/4 <span data-i18n="deel">deel</span></td></tr><tr><td data-i18n="tabel_r4">Zeer zwaar</td><td>3/4 <span data-i18n="deel">deel</span></td><td>3/4 <span data-i18n="deel">deel</span></td></tr></table></div></section>
+<!-- ============ TAB: REKENTOOL ============ --><section id="view-rekentool" class="view"><div class="stepper noprint" id="stepperBar"></div><!-- STEP 1 --><div class="panel step-pane" id="pane-1"><h2 data-i18n="s1_h">1 · Boom &amp; maat</h2><div class="field datalist-wrap"><label for="soortInput" data-i18n="s1_soort">Boomsoort</label><input type="text" id="soortInput" autocomplete="off"><div id="soortResults"></div><div class="hint" id="klasseHint" data-i18n="s1_geen_soort">Nog geen soort gekozen.</div></div><div class="field"><label for="klasseSelect" data-i18n="s1_klasse">Prijsklasse (1 = laag … 4 = hoog)</label><select id="klasseSelect"><option value="1" data-i18n="klasse1">Klasse 1</option><option value="2" data-i18n="klasse2">Klasse 2</option><option value="3" data-i18n="klasse3">Klasse 3</option><option value="4" data-i18n="klasse4">Klasse 4</option></select><div class="hint" data-i18n="s1_klasse_hint">Wordt automatisch gezet bij een bekende soort; pas aan indien nodig.</div></div><div class="field"><label for="maatSelect" data-i18n="s1_maat">Maat bij aanplant (stamomtrek in cm)</label><select id="maatSelect"></select></div><div class="stepnav"><span></span><button class="btn" onclick="gotoStep(2)" data-i18n="btn_volgende">Volgende →</button></div></div><!-- STEP 2 --><div class="panel step-pane" id="pane-2" style="display:none"><h2 data-i18n="s2_h">2 · Leeftijd &amp; levensverwachting</h2><div class="field"><label for="maxLevensverwachting" data-i18n="s2_max">Max. levensverwachting volgens richtlijn (jaren)</label><input type="number" id="maxLevensverwachting" min="1" value="80"><div class="hint" data-i18n="s2_max_hint">Standaard levensverwachting van deze soort op deze standplaats, volgens de geldende boomtaxatie-richtlijn.</div></div><div class="row2"><div class="field"><label for="leeftijdFV" data-i18n="s2_fv">Leeftijd bij functievervulling (jaren)</label><input type="number" id="leeftijdFV" min="1" value="25"></div><div class="field"><label for="leeftijdNu" data-i18n="s2_nu">Huidige leeftijd van de boom (jaren)</label><input type="number" id="leeftijdNu" min="0" value="25"></div></div><div id="berekeningBreakdown"></div><div class="stepnav"><button class="btn ghost" onclick="gotoStep(1)" data-i18n="btn_vorige">← Vorige</button><button class="btn" onclick="gotoStep(3)" data-i18n="btn_volgende">Volgende →</button></div></div><!-- STEP 3 --><div class="panel step-pane" id="pane-3" style="display:none"><h2 data-i18n="s3_h">3 · Schade — D1 of D2</h2><div class="field"><label data-i18n="s3_type">Type schade</label><select id="schadeType"><option value="geen" data-i18n="s3_opt_geen">Geen vervroegde uitval / verhoogd risico</option><option value="D1" data-i18n="s3_opt_d1">D1 — Vervroegde uitval</option><option value="D2" data-i18n="s3_opt_d2">D2 — Verhoogd risico op vervroegde uitval</option></select></div><div id="d1Block" style="display:none"><div class="field"><label data-i18n="s3_d1_label">Percentage schade (kies uit de richttabel of vul zelf in)</label><div class="chipset" id="d1Chips"></div><input type="number" id="d1Pct" min="0" max="100" step="0.1" value="20" style="margin-top:8px"><div class="hint" data-i18n="s3_d1_hint">% van de actuele boomwaarde dat verloren gaat door vervroegde uitval.</div></div></div><div id="d2Block" style="display:none"><div class="field"><label for="d2Pct" data-i18n="s3_d2_label">Toegekend risicopercentage</label><input type="number" id="d2Pct" min="0" max="100" step="0.1" value="10"></div></div><h2 style="margin-top:18px" data-i18n="s3_d3_h">D3 — Functieverlies (optioneel, altijd mogelijk)</h2><label style="display:flex;align-items:center;gap:8px;font-size:.9rem;cursor:pointer"><input type="checkbox" id="d3Toggle" style="width:auto"> <span data-i18n="s3_d3_toggle">Er is aanvullend functieverlies (boom blijft in leven)</span></label><div id="d3Block" style="display:none; margin-top:10px"><div class="row2"><div class="field"><label for="d3Stam" data-i18n="s3_d3_stam">Functieverlies stam/bast/weefsel (%)</label><input type="number" id="d3Stam" min="0" max="100" value="0"></div><div class="field"><label for="d3Wortel" data-i18n="s3_d3_wortel">Functieverlies wortelgestel (%)</label><input type="number" id="d3Wortel" min="0" max="100" value="0"></div></div><div class="field"><label for="d3Kroon" data-i18n="s3_d3_kroon">Functieverlies kroon (%)</label><input type="number" id="d3Kroon" min="0" max="100" value="0"></div><div class="hint" id="d3Totaal"></div></div><div class="stepnav"><button class="btn ghost" onclick="gotoStep(2)" data-i18n="btn_vorige">← Vorige</button><button class="btn" onclick="gotoStep(4)" data-i18n="btn_volgende">Volgende →</button></div></div><!-- STEP 4 --><div class="panel step-pane" id="pane-4" style="display:none"><h2 data-i18n="s4_h">4 · Locatie &amp; overige kosten</h2><div class="field"><label data-i18n="s4_gps_label">Locatie boom (GPS)</label><div><button class="btn ghost small" id="gpsBtn" data-i18n="gps_btn">📍 GPS-positie bepalen</button><button class="btn ghost small" id="addrBtn" style="display:none" data-i18n="addr_btn">🔄 Adres ophalen (internet)</button><button class="btn ghost small" id="mapsBtn" style="display:none" data-i18n="maps_btn">🔗 Open in Google Maps</button></div><div class="hint" id="gpsStatus"></div><input type="text" id="dossierLocatie" data-i18n-ph="s4_locatie_ph"><div id="mapPreview"></div><div class="hint" id="coordHint"></div></div><h2 style="margin-top:18px" data-i18n="s4_extra_h">Overige kosten (optioneel)</h2><p class="hint" data-i18n="s4_extra_hint">Bijv. opruimen, herstel verharding, transport, stempelkosten.</p><div id="extraItems"></div><button class="btn ghost small" onclick="addExtraItem()" data-i18n="s4_extra_add">+ Regel toevoegen</button><h2 style="margin-top:18px" data-i18n="s4_dossier_h">Zaakgegevens (voor het rapport)</h2><div class="row2"><div class="field"><label for="dossierNr" data-i18n="s4_dossiernr">Dossier-/kenmerknummer</label><input type="text" id="dossierNr" data-i18n-ph="s4_optioneel"></div><div class="field"><label for="dossierDatum" data-i18n="s4_datum">Datum schade</label><input type="text" id="dossierDatum" placeholder="dd-mm-jjjj"></div></div><div class="field"><label for="dossierOorzaak" data-i18n="s4_oorzaak">Oorzaak schade</label><input type="text" id="dossierOorzaak" data-i18n-ph="s4_oorzaak_ph"></div><div class="stepnav"><button class="btn ghost" onclick="gotoStep(3)" data-i18n="btn_vorige">← Vorige</button><button class="btn" onclick="gotoStep(5)" data-i18n="btn_resultaat">Bekijk resultaat →</button></div></div><!-- STEP 5 --><div class="panel step-pane" id="pane-5" style="display:none"><div id="resultaatBox"></div><div class="stepnav noprint"><button class="btn ghost" onclick="gotoStep(4)" data-i18n="btn_vorige">← Vorige</button><button class="btn" onclick="window.print()" data-i18n="btn_print">🖨 Print / bewaar als PDF</button></div></div></section>
+<!-- ============ TAB: TARIEVEN ============ --><section id="view-tarieven" class="view"><div class="panel"><div class="tarhead"><h2 data-i18n="tar_h1">Plantgoedprijzen per maat &amp; klasse (excl. btw)</h2><span><button class="btn ghost small" id="editTariefBtn" data-i18n="tar_edit_btn">✏️ Bewerken</button></span></div><p class="hint" data-i18n="tar_edit_hint">De prijzen, arbeids-, nazorg- en beheerkosten dateren uit 2007. Pas ze hier aan naar het huidige prijsniveau — de rekentool gebruikt vanaf dan jouw eigen tarieven.</p><div class="hint" id="tarOverrideNote"></div><table class="calc" id="tariefTable"></table></div><div class="panel"><h2 data-i18n="tar_h2">Aanplant-, nazorg- en beheerkosten per maat</h2><table class="calc" id="kostenTable"></table><div id="tarEditButtons" style="display:none;margin-top:8px"><button class="btn small" id="saveTariefBtn" data-i18n="tar_save_btn">💾 Opslaan</button><button class="btn ghost small danger" id="resetTariefBtn" data-i18n="tar_reset_btn">↺ Terug naar 2007-tarieven</button></div></div><div class="panel"><h2 data-i18n="tar_h3">Financiële uitgangspunten</h2><table class="calc" id="uitgangspuntenTable"></table></div><div class="panel"><h2 data-i18n="tar_h4">Volledige soortenlijst</h2><table class="calc" id="soortenTable"></table></div></section>
+</main>
+<div id="bwCopyFooter" class="noprint">
+© <span id="bwYear"></span> <span class="hl">Jan den Hollander</span> &nbsp;|&nbsp;
+<span class="hl">Boomwaarde &amp; Schadeberekening</span> &nbsp;|&nbsp;
+Gratis · niet-commercieel · ongewijzigd &nbsp;|&nbsp;
+<span class="lic" onclick="document.getElementById('bwLicenseModal').style.display='flex'">ℹ️ Licentie</span>
+</div>
+<div id="bwLicenseModal">
+<div class="box">
+<h3>© Jan den Hollander &nbsp;·&nbsp; <span style="font-weight:normal;font-size:12px;color:#aaa">Boomwaarde &amp; Schadeberekening</span></h3>
+<p><strong style="color:#fff">NL</strong> — Dit hulpmiddel is <strong>gratis</strong> en mag vrij worden gedeeld, uitsluitend <strong>ongewijzigd</strong> en voor <strong>niet-commerciële</strong> doeleinden, met bronvermelding van de oorspronkelijke auteur. Commercieel gebruik, wijziging, verkoop of integratie in betaalde producten is <strong>uitdrukkelijk verboden</strong> zonder schriftelijke toestemming. Hulp is en blijft gratis.</p>
+<p style="color:#bbb;font-size:12px"><strong style="color:#ddd">EN</strong> — This tool is free and may be shared freely, in unmodified form, for non-commercial purposes only, with attribution. Commercial use, modification, sale or integration into paid products or services is strictly prohibited without prior written consent. Help is and remains free.</p>
+<p style="color:#bbb;font-size:12px"><strong style="color:#ddd">IT</strong> — Questo strumento è gratuito e può essere condiviso liberamente, in forma non modificata, esclusivamente per scopi non commerciali, con attribuzione. L'uso commerciale, la modifica, la vendita o l'integrazione in prodotti a pagamento sono vietati senza consenso scritto. L'aiuto è e rimane gratuito.</p>
+<hr style="border-color:#2d5016;margin:14px 0">
+<p style="margin:4px 0">📧 <a href="mailto:jandenhollander@duck.com" style="color:#8fc87a">jandenhollander@duck.com</a></p>
+<p style="margin:4px 0">🔗 <a href="https://github.com/Jan-den-Hollander" target="_blank" style="color:#8fc87a">github.com/Jan-den-Hollander</a></p>
+<button class="close-btn" onclick="document.getElementById('bwLicenseModal').style.display='none'">Sluiten / Close / Chiudere</button>
+</div>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
+const SOORTEN=[["Acer campestre",2,false],["Acer campestre cv",2,false],["Acer cappadocicum",3,false],["Acercappadocium cv",3,false],["Acer davidii",4,false],["Acernegundo",2,false],["Acernegundo cv",2,false],["Acerplatanoides",2,false],["Acerplatanoidescv",2,false],["Acer pseudoplatanus",2,false],["\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"\"cv",2,false],["Acer rubrum",3,false],["Acer rubrum cv",4,false],["Acer rufinerve",4,false],["Acer saccharinum",2,false],["Acer saccharinum cv",2,false],["Aesculus hippocastanum",2,false],["Aesculus hippocastanum cv",2,false],["Aesculus pavia",3,false],["Aesculus pavia cv",3,false],["Aesculus plantierensis",3,false],["Ailanthus altissima",3,false],["Alnus cordata",2,false],["Alnus glutinosa",1,false],["Alnus glutinosa cv",1,false],["Alnus incana",2,false],["Alnus incana cv",2,false],["Alnus spaethii",2,false],["Betula ermanii cv",2,false],["Betula nigra",2,false],["Betula papyrifera",2,false],["Betula pendula",2,false],["Betula pendula cv",2,false],["Betula pubescens",2,false],["Betula utilis cv",2,false],["Carpinus betulus",2,false],["Carpinus betulus cv",2,false],["Carya ovata",4,false],["Castania sativa",2,false],["Castania sativa cv",2,false],["Catalpa binonioides",3,false],["Catalpa binonioides cv",3,false],["Catalpa bungei",3,false],["Catalpa speciosa",3,false],["Celtis occidentalis",3,false],["Cercidiphyllum japonicum",2,false],["Cersis siliquastrum",3,false],["Coryllus colurna",2,false],["Crataegus grgnonensis",3,false],["Crataegus laevigata 'Paul'sSarlet'",2,false],["Crataegus lavallei",2,false],["Crataegus pinnatifida 'Major'",3,false],["Crataegus prunifolia Splendens",3,false],["Davidia involucrata vilmoriniana",4,false],["Fagus sylvatica",2,false],["Fagus sylvatica cv",2,false],["Fraxinus americana",3,false],["Fraxinus angustifolia cv",2,false],["Fraxinus excelsior",2,false],["Fraxinus excelsior cv",2,false],["Fraxinus ornus",3,false],["Fraxinus ornus cv",3,false],["Fraxinus pennsylvanica 'Zundert'",3,false],["Ginkgo biloba",3,false],["Gledisia triacanthos",2,false],["Gledisia triacanthos cv",2,false],["Gymnocladus dioicus",4,false],["Halesia carolina",4,false],["Juglans nigra",2,false],["Juglans regia",2,false],["Koelreuteria paniculata",3,false],["Laburnum watereri 'Vossii'",3,false],["Liquidambar styraciflua",3,false],["Liriodendron tulipifera",3,false],["Liriodendron tulipifera cv",3,false],["Maackia amurensis",4,false],["Maclura pomifera",4,false],["Magnolia acuminata",4,false],["Magnolia grandiflora",4,false],["Magnolia kobus",3,false],["Malus cv",2,false],["Melia azedarach",4,false],["Mespilus germanica",3,false],["Metasequoia glyptroboides",2,false],["Morus alba",3,false],["Morus alba cv",3,false],["Morus nigra",3,false],["Nothofagus antartica",4,false],["Nyssa sylvatica",4,false],["Ostrya carpinifolia",2,false],["Parrotia persica",4,false],["Paulonia tomentosa",3,false],["Phellodendron amurense",3,false],["Platanus acerifolia",2,false],["Platanus acerifolia cv",2,false],["Platanus orientalis",2,false],["Populus balsamifera",3,false],["Populus berolinensis",3,false],["Populus canescens cv",1,false],["Populus euramericana cv",1,false],["Populus nigra",1,false],["Populus nigra cv",1,false],["Populus tremula",1,false],["Populus tremula cv",1,false],["Prunus avium",1,false],["Prunus avium cv",1,false],["Prunus cerasifera cv",2,false],["Prunus eminens Úmbraculifera'",2,false],["Prunus hillieri cv",3,false],["Prunus sargentii",3,false],["Prunus serrulata cv",3,false],["Prunus subhirtella cv",2,false],["Prunus yedoensis",2,false],["Ptelea trifoliata",4,false],["Pterocarya fraxinifolia",2,false],["Pyrus calleriana cv",2,false],["Pyrus communis cv",2,false],["Quercus cerris",2,false],["Quercus frainetto",2,false],["Quercus palustris",2,false],["Quercus petraea",2,false],["Quercus robur",2,false],["Quercus robur cv",2,false],["Quercus rubra",2,false],["Quercus turneri",4,false],["Robinia ambigua cv",3,false],["Robinia pseudoacacia",2,false],["Robinia pseudoacacia cv",2,false],["Salix alba cv",1,false],["Salix pentandra",2,false],["Salix sepulcralis 'Tristis'",2,false],["Sequoiadendron giganteum",4,false],["Sophora japonica",3,false],["Sophora japonica cv",3,false],["Sorbus aria",2,false],["Sorbus aria cv",2,false],["Sorbus aucuparia",2,false],["Sorbus aucuparia cv",2,false],["Sorbus intermedia",2,false],["Sorbus intermedia cv",2,false],["Sorbus latifolia",2,false],["Sorbus latifolia cv",2,false],["Sorbus thuringica'Fastigiata'",2,false],["Taxodium distichum",4,false],["Tilia americana",2,false],["Tilia americana cv",2,false],["Tilia cordata",2,false],["Tilia cordata cv",2,false],["Tilia euchlora",2,false],["Tilia mongolica",4,false],["Tilia tomentosa",2,false],["Tilia tomentosa cv",2,false],["Tilia platyphyllos",2,false],["Tilia platyphyllos cv",2,false],["Tilia vulgaris",2,false],["Tilia vulgaris cv",2,false],["Ulmus carpinifolia",2,false],["Ulmus carpinifolia cv",2,false],["Ulmus glabra",2,false],["Ulmus glabra cv",2,false],["Ulmus hollandica",2,false],["Ulmus hollandica cv",2,false],["Zelkova serrata",3,false],["Abies",2,true],["Araucaria",3,true],["Cedrus",2,true],["Chamaecyparis",2,true],["Juniperus",3,true],["Larix",2,true],["Picea",2,true],["Pinus",2,true],["Pseudotsuga",2,true],["Taxus",3,true],["Thuja",2,true],["Tsuga",2,true]];
+/* ===== i18n ===== */
+const TR = {
+nl:{
+app_title:"Boomwaarde &amp; Schadeberekening", tarief_badge:"tarieven aanpasbaar",
+app_sub:"Vervangingswaarde en schadebepaling van bomen na aanrijding of illegale kap, volgens de Nederlandse boomtaxatiemethode. Werkt volledig offline.",
+tab_uitleg:"Uitleg &amp; beslisboom", tab_rekentool:"Rekentool", tab_tarieven:"Tarieventabellen",
+uitleg_h:"Hoe werkt deze berekening?",
+uitleg_intro:"Eerst wordt de <strong>boomwaarde</strong> berekend: wat zou het kosten om deze boom, op deze plek, opnieuw te laten opgroeien tot dezelfde staat? Daarna wordt bepaald welk deel daarvan door de schade verloren is gegaan.",
+flow1_h:"1 · Boom &amp; maat kiezen", flow1_p:"Boomsoort (bepaalt prijsklasse 1-4) en de maat (stamomtrek/omvang bij aanplant) uit de tarieventabel.",
+flow2_h:"2 · Kosten van vervanging", flow2_p:"Plantgoed + btw, aanplant/arbeid + btw, 10% aanplantgarantie, rente over de nazorgperiode, jaarlijkse nazorg- en beheerkosten.",
+flow3_h:"3 · Doorrekenen naar functievervulling", flow3_p:"De waarde wordt met 4% rente doorgerekend naar het moment waarop de nieuwe boom dezelfde functie zou vervullen als de huidige boom.",
+flow4_h:"4 · Afschrijven naar nu", flow4_p:"Op basis van de huidige leeftijd t.o.v. de verwachte levensduur wordt de waarde teruggerekend naar de <strong>actuele boomwaarde voor schade</strong>.",
+flow5_h:"5 · Schadetype bepalen",
+d1_h:"D1 - Vervroegde uitval", d1_p:"De boom moet als gevolg van de schade eerder vervangen worden dan gepland. Schade = actuele boomwaarde x percentage uit de schadetabel.",
+d2_h:"D2 - Verhoogd risico op uitval", d2_p:"Geen directe vervanging nodig, maar wel een verhoogde kans op eerder afsterven. Schade = actuele boomwaarde x toegekend risicopercentage.",
+d1d2_note:"D1 en D2 sluiten elkaar uit - kies er hooguit een.",
+flow6_h:"6 · D3 - Functieverlies (optioneel, altijd toepasbaar)", flow6_p:"Blijvende schade terwijl de boom in leven blijft: stam-/bastschade, wortelschade en kroonverlies, elk als percentage.",
+flow7_h:"7 · Resultaat", flow7_p:"Totale schade + resterende boomwaarde, evt. aangevuld met specifieke kosten. Printbaar rapport inclusief locatie op kaart.",
+tabel_h:"Schadepercentages D1/D3 - richttabel", tabel_hint:"Richtpercentages voor de ernst van de schade; kies wat het beste past, altijd handmatig aan te passen.",
+tabel_cat:"Categorie", tabel_c1:"Schade 5%-25%", tabel_c2:"Schade 25%-50%",
+tabel_r1:"Licht", tabel_r2:"Matig", tabel_r3:"Zwaar", tabel_r4:"Zeer zwaar", deel:"deel",
+s1_h:"1 · Boom &amp; maat", s1_soort:"Boomsoort", s1_geen_soort:"Nog geen soort gekozen.",
+s1_klasse:"Prijsklasse (1 = laag ... 4 = hoog)", klasse1:"Klasse 1", klasse2:"Klasse 2", klasse3:"Klasse 3", klasse4:"Klasse 4",
+s1_klasse_hint:"Wordt automatisch gezet bij een bekende soort; pas aan indien nodig.",
+s1_maat:"Maat bij aanplant (stamomtrek in cm)",
+btn_volgende:"Volgende ->", btn_vorige:"<- Vorige", btn_resultaat:"Bekijk resultaat ->", btn_print:"Print / bewaar als PDF",
+s2_h:"2 · Leeftijd &amp; levensverwachting", s2_max:"Max. levensverwachting volgens richtlijn (jaren)",
+s2_max_hint:"Standaard levensverwachting van deze soort op deze standplaats, volgens de geldende boomtaxatie-richtlijn.",
+s2_fv:"Leeftijd bij functievervulling (jaren)", s2_nu:"Huidige leeftijd van de boom (jaren)",
+s3_h:"3 · Schade - D1 of D2", s3_type:"Type schade",
+s3_opt_geen:"Geen vervroegde uitval / verhoogd risico",
+s3_opt_d1:"D1 - Vervroegde uitval", s3_opt_d2:"D2 - Verhoogd risico op vervroegde uitval",
+s3_d1_label:"Percentage schade (kies uit de richttabel of vul zelf in)", s3_d1_hint:"% van de actuele boomwaarde dat verloren gaat door vervroegde uitval.",
+s3_d2_label:"Toegekend risicopercentage",
+s3_d3_h:"D3 - Functieverlies (optioneel, altijd mogelijk)", s3_d3_toggle:"Er is aanvullend functieverlies (boom blijft in leven)",
+s3_d3_stam:"Functieverlies stam/bast/weefsel (%)", s3_d3_wortel:"Functieverlies wortelgestel (%)", s3_d3_kroon:"Functieverlies kroon (%)",
+d3_totaal:"Totaal functieverlies:", d3_afgetopt:" (afgetopt op 100%)",
+chip1:"1/5 (licht, 5-25%)", chip2:"1/4 (licht, 25-50% of matig 5-25%)", chip3:"1/2 (zwaar, 5-25% of matig 25-50%)", chip4:"3/4 (zeer zwaar)",
+s4_h:"4 · Locatie &amp; overige kosten", s4_gps_label:"Locatie boom (GPS)",
+gps_btn:"GPS-positie bepalen", addr_btn:"Adres ophalen (internet)", maps_btn:"Open in Google Maps",
+s4_locatie_ph:"adres (automatisch of handmatig invullen)",
+gps_locating:"Bezig met GPS-positie bepalen...", gps_error:"Kon geen GPS-positie bepalen. Controleer locatietoestemming.",
+gps_nogeoloc:"GPS niet beschikbaar op dit toestel/deze browser.",
+gps_offline_note:"Geen internetverbinding - coordinaten zijn opgeslagen, adres ophalen kan later (bv. op kantoor).",
+addr_looking:"Adres opzoeken...", addr_found:"Adres gevonden.", addr_notfound:"Geen adres gevonden voor deze coordinaten.",
+s4_extra_h:"Overige kosten (optioneel)", s4_extra_hint:"Bijv. opruimen, herstel verharding, transport, stempelkosten.",
+s4_extra_add:"+ Regel toevoegen",
+s4_dossier_h:"Zaakgegevens (voor het rapport)", s4_dossiernr:"Dossier-/kenmerknummer", s4_optioneel:"optioneel",
+s4_datum:"Datum schade", s4_oorzaak:"Oorzaak schade", s4_oorzaak_ph:"bv. aanrijding, illegale kap",
+tar_h1:"Plantgoedprijzen per maat &amp; klasse (excl. btw)", tar_h2:"Aanplant-, nazorg- en beheerkosten per maat",
+tar_h3:"Financiele uitgangspunten", tar_h4:"Volledige soortenlijst",
+tar_edit_btn:"Bewerken", tar_save_btn:"Opslaan", tar_reset_btn:"Terug naar 2007-tarieven",
+tar_edit_hint:"Prijzen, arbeids-, nazorg- en beheerkosten dateren uit 2007. Pas ze aan naar het huidige niveau - de rekentool gebruikt dan jouw eigen tarieven.",
+tar_override_note:"Aangepaste tarieven actief (laatst gewijzigd: {datum}).",
+tar_confirm_reset:"Weet je zeker dat je terug wilt naar de originele 2007-tarieven? Je aanpassingen gaan verloren.",
+tar_saved_ok:"Tarieven opgeslagen.",
+tar_maat:"Maat", tar_aanplant:"Aanplant/arbeid", tar_nazorg:"Nazorg per jaar", tar_beheer:"Beheer per jaar",
+tar_soort:"Soort", tar_klasse:"Klasse", tar_naaldboom:"naaldboom",
+ug_btwplant:"Btw plantgoed", ug_btwarbeid:"Btw arbeid/nazorg/beheer", ug_garantie:"Aanplantgarantie",
+ug_rente1:"Rente aanplant, 3 jaar nazorg", ug_rente2:"Rentefactor nazorgkosten, 3 jaar", ug_rekenrente:"Rekenrente doorrekening naar functievervulling",
+ug_rekenrente_v:"4% samengesteld per jaar", ug_soorten:"Boomsoorten in database", ug_soorten_v:"175, in 4 prijsklassen",
+bd_plantgoed:"Plantgoed (maat {maat}, klasse {klasse})", bd_btw6:"Btw plantgoed (6%)", bd_aanplant:"Aanplant / arbeid",
+bd_btw19:"Btw aanplant (19%)", bd_kostenaanplant:"Kosten aanplant (subtotaal)", bd_garantie:"+ 10% aanplantgarantie",
+bd_rentenazorg:"+ rente 3 jr nazorg (x1,12)", bd_nazorgtotaal:"Nazorg per jaar (incl. btw, x3,12)", bd_boomwaardeaanplant:"Boomwaarde bij aanplant (totaal)",
+bd_beheerperjaar:"Beheerkosten per jaar", bd_rentejaren:"Rentejaren tot functievervulling (N)",
+bd_beheertotfv:"Beheerkosten tot FV (rentefactor {f})", bd_boomwaarderente:"Boomwaarde met rente tot FV (factor {f})",
+bd_boomwaardefv:"Boomwaarde bij functievervulling", bd_functieouderdom:"Functionele ouderdom (huidig - FV)",
+bd_resterendelevensduur:"Resterende levensduur na FV", bd_afschrijvingsfactor:"Afschrijvingsfactor", bd_actueleboomwaarde:"ACTUELE BOOMWAARDE (voor schade)",
+res_rapport_titel:"Boomwaarde- en schaderapport", res_datum:"Datum rapport", res_dossier:"Dossier", res_schadedatum:"Schadedatum",
+res_locatie:"Locatie", res_oorzaak:"Oorzaak", res_soort:"Boomsoort", res_niet_gekozen:"niet gekozen", res_klasse:"Klasse", res_maat:"Maat",
+res_actueleboomwaarde:"Actuele boomwaarde voor schade", res_totaleschade_label:"totale schadevergoeding",
+res_schade_d1:"Schade D1 - vervroegde uitval", res_schade_d2:"Schade D2 - verhoogd risico op uitval",
+res_schade_d3:"Schade D3 functieverlies", res_stam:"stam", res_wortel:"wortel", res_kroon:"kroon",
+res_resterende:"Resterende boomwaarde", res_overige:"Overige kosten", res_totaal:"TOTALE SCHADE",
+res_overige_detail_h:"Overige kosten - detail", res_onderbouwing_h:"Volledige onderbouwing boomwaarde",
+res_footer:"(c) Jan den Hollander - rapport gegenereerd met de Boomwaarde & Schadeberekening-tool, gebaseerd op de Nederlandse boomtaxatiemethode.",
+res_gps:"GPS-coordinaten"
+},
+it:{
+app_title:"Valutazione danni e valore degli alberi", tarief_badge:"tariffe modificabili",
+app_sub:"Valore di sostituzione e danno agli alberi in caso di incidenti o abbattimento illegale, secondo il metodo olandese di valutazione. Funziona offline.",
+tab_uitleg:"Spiegazione e schema decisionale", tab_rekentool:"Calcolatore", tab_tarieven:"Tabelle tariffarie",
+uitleg_h:"Come funziona questo calcolo?",
+uitleg_intro:"Prima si calcola il <strong>valore dell'albero</strong>: quanto costerebbe far ricrescere questo albero, in questo punto, fino allo stesso stato? Poi si stabilisce quale parte e andata persa per il danno.",
+flow1_h:"1 · Scelta di specie e misura", flow1_p:"Specie arborea (determina la classe di prezzo 1-4) e la misura (circonferenza del tronco) dalla tabella tariffaria.",
+flow2_h:"2 · Costi di sostituzione", flow2_p:"Materiale vegetale + IVA, messa a dimora/manodopera + IVA, garanzia di attecchimento 10%, interessi sul periodo di cura, costi annui di cura e gestione.",
+flow3_h:"3 · Proiezione all'adempimento della funzione", flow3_p:"Il valore viene proiettato con un interesse del 4% fino al momento in cui il nuovo albero svolgerebbe la stessa funzione dell'albero attuale.",
+flow4_h:"4 · Ammortamento fino a oggi", flow4_p:"In base all'eta attuale rispetto alla durata di vita prevista, il valore viene riportato al <strong>valore attuale dell'albero prima del danno</strong>.",
+flow5_h:"5 · Determinazione del tipo di danno",
+d1_h:"D1 - Perdita anticipata", d1_p:"A causa del danno l'albero deve essere sostituito prima del previsto. Danno = valore attuale x percentuale dalla tabella danni.",
+d2_h:"D2 - Rischio maggiore di perdita", d2_p:"Non e necessaria una sostituzione diretta, ma c'e un rischio maggiore di morte prematura. Danno = valore attuale x percentuale di rischio attribuita.",
+d1d2_note:"D1 e D2 si escludono a vicenda - sceglierne al massimo uno.",
+flow6_h:"6 · D3 - Perdita di funzione (facoltativo, sempre applicabile)", flow6_p:"Danno permanente mentre l'albero resta in vita: danni al tronco/corteccia, danni alle radici e perdita di chioma, ciascuno come percentuale.",
+flow7_h:"7 · Risultato", flow7_p:"Danno totale + valore residuo, eventuali costi specifici. Rapporto stampabile con posizione sulla mappa.",
+tabel_h:"Percentuali di danno D1/D3 - tabella di riferimento", tabel_hint:"Percentuali indicative; scegliere la piu adatta, sempre modificabile a mano.",
+tabel_cat:"Categoria", tabel_c1:"Danno 5%-25%", tabel_c2:"Danno 25%-50%",
+tabel_r1:"Lieve", tabel_r2:"Moderato", tabel_r3:"Grave", tabel_r4:"Molto grave", deel:"",
+s1_h:"1 · Specie e misura", s1_soort:"Specie arborea", s1_geen_soort:"Nessuna specie ancora scelta.",
+s1_klasse:"Classe di prezzo (1 = bassa ... 4 = alta)", klasse1:"Classe 1", klasse2:"Classe 2", klasse3:"Classe 3", klasse4:"Classe 4",
+s1_klasse_hint:"Viene impostata automaticamente per una specie nota; modificare se necessario.",
+s1_maat:"Misura alla messa a dimora (circonferenza tronco in cm)",
+btn_volgende:"Avanti ->", btn_vorige:"<- Indietro", btn_resultaat:"Vedi risultato ->", btn_print:"Stampa / salva come PDF",
+s2_h:"2 · Eta e aspettativa di vita", s2_max:"Aspettativa di vita massima secondo linee guida (anni)",
+s2_max_hint:"Aspettativa di vita standard di questa specie in questa posizione, secondo le linee guida vigenti.",
+s2_fv:"Eta di adempimento della funzione (anni)", s2_nu:"Eta attuale dell'albero (anni)",
+s3_h:"3 · Danno - D1 o D2", s3_type:"Tipo di danno",
+s3_opt_geen:"Nessuna perdita anticipata / rischio maggiore",
+s3_opt_d1:"D1 - Perdita anticipata", s3_opt_d2:"D2 - Rischio maggiore di perdita anticipata",
+s3_d1_label:"Percentuale di danno (scegliere dalla tabella o inserire manualmente)", s3_d1_hint:"% del valore attuale perso a causa della perdita anticipata.",
+s3_d2_label:"Percentuale di rischio attribuita",
+s3_d3_h:"D3 - Perdita di funzione (facoltativo, sempre possibile)", s3_d3_toggle:"C'e una perdita di funzione aggiuntiva (l'albero resta in vita)",
+s3_d3_stam:"Perdita di funzione tronco/corteccia/tessuto (%)", s3_d3_wortel:"Perdita di funzione apparato radicale (%)", s3_d3_kroon:"Perdita di funzione chioma (%)",
+d3_totaal:"Perdita di funzione totale:", d3_afgetopt:" (limitato al 100%)",
+chip1:"1/5 (lieve, 5-25%)", chip2:"1/4 (lieve, 25-50% o moderato 5-25%)", chip3:"1/2 (grave, 5-25% o moderato 25-50%)", chip4:"3/4 (molto grave)",
+s4_h:"4 · Posizione e costi aggiuntivi", s4_gps_label:"Posizione dell'albero (GPS)",
+gps_btn:"Rileva posizione GPS", addr_btn:"Recupera indirizzo (internet)", maps_btn:"Apri in Google Maps",
+s4_locatie_ph:"indirizzo (automatico o manuale)",
+gps_locating:"Rilevamento posizione GPS in corso...", gps_error:"Impossibile rilevare la posizione GPS. Controllare i permessi.",
+gps_nogeoloc:"GPS non disponibile su questo dispositivo/browser.",
+gps_offline_note:"Nessuna connessione internet - coordinate salvate, l'indirizzo puo essere recuperato piu tardi (es. in ufficio).",
+addr_looking:"Ricerca indirizzo...", addr_found:"Indirizzo trovato.", addr_notfound:"Nessun indirizzo trovato per queste coordinate.",
+s4_extra_h:"Costi aggiuntivi (facoltativo)", s4_extra_hint:"Es. rimozione, ripristino pavimentazione, trasporto, spese di perizia.",
+s4_extra_add:"+ Aggiungi riga",
+s4_dossier_h:"Dati del fascicolo (per il rapporto)", s4_dossiernr:"Numero di pratica/riferimento", s4_optioneel:"facoltativo",
+s4_datum:"Data del danno", s4_oorzaak:"Causa del danno", s4_oorzaak_ph:"es. incidente, abbattimento illegale",
+tar_h1:"Prezzi materiale vegetale per misura e classe (IVA escl.)", tar_h2:"Costi di messa a dimora, cura e gestione per misura",
+tar_h3:"Principi finanziari", tar_h4:"Elenco completo delle specie",
+tar_edit_btn:"Modifica", tar_save_btn:"Salva", tar_reset_btn:"Ripristina tariffe 2007",
+tar_edit_hint:"Prezzi, costi di manodopera, cura e gestione del 2007. Modificali al livello attuale - il calcolatore usera le tue tariffe.",
+tar_override_note:"Tariffe personalizzate attive (ultima modifica: {datum}).",
+tar_confirm_reset:"Vuoi davvero tornare alle tariffe originali del 2007? Le modifiche andranno perse.",
+tar_saved_ok:"Tariffe salvate.",
+tar_maat:"Misura", tar_aanplant:"Messa a dimora/manodopera", tar_nazorg:"Cura annua", tar_beheer:"Gestione annua",
+tar_soort:"Specie", tar_klasse:"Classe", tar_naaldboom:"conifera",
+ug_btwplant:"IVA materiale vegetale", ug_btwarbeid:"IVA manodopera/cura/gestione", ug_garantie:"Garanzia di attecchimento",
+ug_rente1:"Interesse messa a dimora, 3 anni di cura", ug_rente2:"Fattore d'interesse costi di cura, 3 anni", ug_rekenrente:"Tasso di calcolo proiezione all'adempimento funzione",
+ug_rekenrente_v:"4% composto annuo", ug_soorten:"Specie arboree nel database", ug_soorten_v:"175, in 4 classi di prezzo",
+bd_plantgoed:"Materiale vegetale (misura {maat}, classe {klasse})", bd_btw6:"IVA materiale vegetale (6%)", bd_aanplant:"Messa a dimora / manodopera",
+bd_btw19:"IVA messa a dimora (19%)", bd_kostenaanplant:"Costi di messa a dimora (subtotale)", bd_garantie:"+ 10% garanzia di attecchimento",
+bd_rentenazorg:"+ interesse 3 anni cura (x1,12)", bd_nazorgtotaal:"Cura annua (IVA incl., x3,12)", bd_boomwaardeaanplant:"Valore albero alla messa a dimora (totale)",
+bd_beheerperjaar:"Costi di gestione annui", bd_rentejaren:"Anni d'interesse fino ad adempimento funzione (N)",
+bd_beheertotfv:"Costi di gestione fino a FV (fattore {f})", bd_boomwaarderente:"Valore con interesse fino a FV (fattore {f})",
+bd_boomwaardefv:"Valore albero all'adempimento funzione", bd_functieouderdom:"Eta funzionale (attuale - FV)",
+bd_resterendelevensduur:"Durata di vita residua dopo FV", bd_afschrijvingsfactor:"Fattore di ammortamento", bd_actueleboomwaarde:"VALORE ATTUALE DELL'ALBERO (prima del danno)",
+res_rapport_titel:"Rapporto valore e danno albero", res_datum:"Data rapporto", res_dossier:"Pratica", res_schadedatum:"Data danno",
+res_locatie:"Posizione", res_oorzaak:"Causa", res_soort:"Specie arborea", res_niet_gekozen:"non scelta", res_klasse:"Classe", res_maat:"Misura",
+res_actueleboomwaarde:"Valore attuale dell'albero prima del danno", res_totaleschade_label:"risarcimento totale",
+res_schade_d1:"Danno D1 - perdita anticipata", res_schade_d2:"Danno D2 - rischio maggiore di perdita",
+res_schade_d3:"Danno D3 perdita di funzione", res_stam:"tronco", res_wortel:"radici", res_kroon:"chioma",
+res_resterende:"Valore residuo dell'albero", res_overige:"Costi aggiuntivi", res_totaal:"DANNO TOTALE",
+res_overige_detail_h:"Costi aggiuntivi - dettaglio", res_onderbouwing_h:"Motivazione completa del valore dell'albero",
+res_footer:"(c) Jan den Hollander - rapporto generato con lo strumento di valutazione danni e valore degli alberi, basato sul metodo olandese di valutazione.",
+res_gps:"Coordinate GPS"
+}
+};
+let LANG = localStorage.getItem('boomschade_lang') || 'nl';
+function t(key, vars){
+let s = (TR[LANG] && TR[LANG][key]!=null) ? TR[LANG][key] : (TR.nl[key]!=null ? TR.nl[key] : key);
+if(vars) Object.keys(vars).forEach(k=>{ s = s.replace('{'+k+'}', vars[k]); });
+return s;
+}
+function applyI18n(){
+document.documentElement.lang = LANG;
+document.querySelectorAll('[data-i18n]').forEach(el=>{ el.innerHTML = t(el.getAttribute('data-i18n')); });
+document.querySelectorAll('[data-i18n-ph]').forEach(el=>{ el.setAttribute('placeholder', t(el.getAttribute('data-i18n-ph'))); });
+document.querySelectorAll('.langtoggle button').forEach(b=>{ b.classList.toggle('active', b.dataset.lang===LANG); });
+renderTarievenTab();
+if(document.getElementById('pane-2') && document.getElementById('pane-2').style.display!=='none') renderBreakdown();
+if(document.getElementById('pane-5') && document.getElementById('pane-5').style.display!=='none') renderResultaat();
+if(gpsCoord) updateCoordHint();
+const d1w = document.getElementById('d1Chips'); if(d1w){ d1w.innerHTML=''; initD1Chips(); }
+}
+function setLang(l){ LANG=l; localStorage.setItem('boomschade_lang', l); applyI18n(); }
+/* ===== Data: tarieven, kosten, constanten (2007-basis) ===== */
+const MATEN = ["14/16","16/18","18/20","20/25","25/30","30/35","35/40","40/45","45/50","50/60"];
+const TARIEF_DEFAULT = {
+"14/16":[125,150,175,200], "16/18":[175,200,225,250], "18/20":[225,275,325,375],
+"20/25":[300,350,400,500], "25/30":[400,500,600,700], "30/35":[500,650,750,950],
+"35/40":[650,850,1100,1500], "40/45":[850,1000,1400,2000], "45/50":[1200,1500,2000,3250],
+"50/60":[1750,2500,3000,4000]
+};
+const INSTALL_DEFAULT = {"14/16":200,"16/18":225,"18/20":275,"20/25":390,"25/30":400,"30/35":450,"35/40":500,"40/45":550,"45/50":600,"50/60":700};
+const NAZORG_DEFAULT  = {"14/16":180,"16/18":200,"18/20":225,"20/25":250,"25/30":275,"30/35":300,"35/40":325,"40/45":350,"45/50":375,"50/60":395};
+const BEHEER_DEFAULT  = {"14/16":12.5,"16/18":15,"18/20":17.5,"20/25":17.5,"25/30":20,"30/35":22.5,"35/40":22.5,"40/45":25,"45/50":30,"50/60":35};
+const BTW_LAAG=0.06, BTW_HOOG=0.19, GARANTIE=1.10, RENTE_AANPLANT=1.12, RENTE_NAZORG=3.12, NAZORGJAREN=3;
+/* Werkende tarieven (met evt. gebruikersaanpassingen) */
+let TARIEF = JSON.parse(JSON.stringify(TARIEF_DEFAULT));
+let INSTALL = Object.assign({}, INSTALL_DEFAULT);
+let NAZORG = Object.assign({}, NAZORG_DEFAULT);
+let BEHEER = Object.assign({}, BEHEER_DEFAULT);
+let tariefOverrideDatum = null;
+let tarEditMode = false;
+function loadTariefOverrides(){
+try{
+const raw = localStorage.getItem('boomschade_tarieven_v1');
+if(!raw) return;
+const o = JSON.parse(raw);
+if(o.TARIEF) TARIEF = o.TARIEF;
+if(o.INSTALL) INSTALL = o.INSTALL;
+if(o.NAZORG) NAZORG = o.NAZORG;
+if(o.BEHEER) BEHEER = o.BEHEER;
+tariefOverrideDatum = o.datum || null;
+}catch(e){}
+}
+function saveTariefOverrides(){
+const o = {TARIEF, INSTALL, NAZORG, BEHEER, datum:new Date().toLocaleDateString(LANG==='it'?'it-IT':'nl-NL')};
+localStorage.setItem('boomschade_tarieven_v1', JSON.stringify(o));
+tariefOverrideDatum = o.datum;
+}
+function resetTarieven(){
+TARIEF = JSON.parse(JSON.stringify(TARIEF_DEFAULT));
+INSTALL = Object.assign({}, INSTALL_DEFAULT);
+NAZORG = Object.assign({}, NAZORG_DEFAULT);
+BEHEER = Object.assign({}, BEHEER_DEFAULT);
+tariefOverrideDatum = null;
+localStorage.removeItem('boomschade_tarieven_v1');
+}
+function g1factor(n){ n=Math.max(0,n); return Math.pow(1.04,n); }
+function g2factor(n){ n=Math.max(0,n); if(n===0) return 0; return 1.04*(Math.pow(1.04,n)-1)/0.04; }
+function fmt(v){ return "\u20ac " + (Math.round(v*100)/100).toLocaleString(LANG==='it'?'it-IT':'nl-NL',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function pct(v){ return (Math.round(v*1000)/10).toLocaleString(LANG==='it'?'it-IT':'nl-NL',{maximumFractionDigits:1}) + "%"; }
+/* ===== State ===== */
+let state = { soort:"", klasse:2, maat:"20/25" };
+let gpsCoord = null;
+let leafletMap = null, leafletMarker = null;
+let extraItems = [];
+function loadState(){
+try{
+const s = JSON.parse(localStorage.getItem('boomschade_v1'));
+if(s){ Object.assign(state,s); if(s.gpsCoord) gpsCoord = s.gpsCoord; if(Array.isArray(s.extra)) extraItems = s.extra; }
+}catch(e){}
+}
+function saveState(){
+try{ const inp = collectInput(); inp.gpsCoord = gpsCoord; localStorage.setItem('boomschade_v1', JSON.stringify(inp)); }catch(e){}
+}
+/* ===== Boom & maat picker ===== */
+function initSoortPicker(){
+const inp = document.getElementById('soortInput');
+const results = document.getElementById('soortResults');
+inp.addEventListener('input', ()=>{
+const q = inp.value.trim().toLowerCase();
+results.innerHTML='';
+if(q.length<2){ results.style.display='none'; return; }
+const matches = SOORTEN.filter(s=>s[0].toLowerCase().includes(q)).slice(0,30);
+if(!matches.length){ results.style.display='none'; return; }
+matches.forEach(s=>{
+const d=document.createElement('div');
+d.textContent = s[0] + "  \u00b7  " + t('tar_klasse') + " " + s[1] + (s[2] ? " \u00b7 " + t('tar_naaldboom') : "");
+d.onclick = ()=>{ selectSoort(s); results.style.display='none'; };
+results.appendChild(d);
+});
+results.style.display='block';
+});
+document.addEventListener('click', (e)=>{ if(!results.contains(e.target) && e.target!==inp) results.style.display='none'; });
+const maatSel = document.getElementById('maatSelect');
+MATEN.forEach(m=>{ const o=document.createElement('option'); o.value=m; o.textContent=m; maatSel.appendChild(o); });
+maatSel.value = state.maat;
+maatSel.addEventListener('change', ()=>{ state.maat = maatSel.value; recalcAll(); });
+document.getElementById('klasseSelect').addEventListener('change', (e)=>{ state.klasse = parseInt(e.target.value); recalcAll(); });
+if(state.soort){ inp.value = state.soort; document.getElementById('klasseHint').textContent = state.soort; }
+document.getElementById('klasseSelect').value = String(state.klasse);
+}
+function selectSoort(s){
+state.soort = s[0]; state.klasse = s[1];
+document.getElementById('soortInput').value = s[0];
+document.getElementById('klasseSelect').value = String(s[1]);
+document.getElementById('klasseHint').textContent = s[0] + " \u2014 " + t('tar_klasse') + " " + s[1] + (s[2]?" ("+t('tar_naaldboom')+")":"");
+recalcAll();
+}
+/* ===== GPS & kaart ===== */
+function initGPS(){
+document.getElementById('gpsBtn').addEventListener('click', doGetGPS);
+document.getElementById('addrBtn').addEventListener('click', tryReverseGeocode);
+document.getElementById('mapsBtn').addEventListener('click', ()=>{
+if(gpsCoord) window.open('https://www.google.com/maps?q='+gpsCoord.lat+','+gpsCoord.lon, '_blank');
+});
+if(gpsCoord) showMap();
+}
+function doGetGPS(){
+if(!('geolocation' in navigator)){ document.getElementById('gpsStatus').textContent = t('gps_nogeoloc'); return; }
+document.getElementById('gpsStatus').textContent = t('gps_locating');
+navigator.geolocation.getCurrentPosition(pos=>{
+gpsCoord = {lat:pos.coords.latitude, lon:pos.coords.longitude, accuracy:pos.coords.accuracy, timestamp:Date.now()};
+showMap();
+tryReverseGeocode();
+saveState();
+}, err=>{
+document.getElementById('gpsStatus').textContent = t('gps_error');
+}, {enableHighAccuracy:true, timeout:15000, maximumAge:0});
+}
+function showMap(){
+if(!gpsCoord) return;
+document.getElementById('mapPreview').style.display='block';
+document.getElementById('mapsBtn').style.display='inline-block';
+document.getElementById('addrBtn').style.display='inline-block';
+updateCoordHint();
+try{
+if(!leafletMap && window.L){
+leafletMap = L.map('mapPreview').setView([gpsCoord.lat, gpsCoord.lon], 17);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'\u00a9 OpenStreetMap'}).addTo(leafletMap);
+leafletMarker = L.marker([gpsCoord.lat, gpsCoord.lon]).addTo(leafletMap);
+} else if(leafletMap){
+leafletMap.setView([gpsCoord.lat, gpsCoord.lon], 17);
+leafletMarker.setLatLng([gpsCoord.lat, gpsCoord.lon]);
+setTimeout(()=>leafletMap.invalidateSize(), 200);
+}
+}catch(e){}
+}
+function updateCoordHint(){
+if(!gpsCoord) return;
+document.getElementById('coordHint').textContent =
+gpsCoord.lat.toFixed(6)+', '+gpsCoord.lon.toFixed(6)+' (\u00b1'+Math.round(gpsCoord.accuracy||0)+'m) \u00b7 '+ new Date(gpsCoord.timestamp).toLocaleString(LANG==='it'?'it-IT':'nl-NL');
+}
+function tryReverseGeocode(){
+if(!gpsCoord) return;
+if(!navigator.onLine){ document.getElementById('gpsStatus').textContent = t('gps_offline_note'); return; }
+document.getElementById('gpsStatus').textContent = t('addr_looking');
+fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat='+gpsCoord.lat+'&lon='+gpsCoord.lon)
+.then(r=>r.json()).then(d=>{
+if(d && d.display_name){ document.getElementById('dossierLocatie').value = d.display_name; document.getElementById('gpsStatus').textContent = t('addr_found'); saveState(); }
+else { document.getElementById('gpsStatus').textContent = t('addr_notfound'); }
+}).catch(()=>{ document.getElementById('gpsStatus').textContent = t('gps_offline_note'); });
+}
+/* ===== Berekening boomwaarde ===== */
+function berekenBoomwaarde(inp){
+const maat = inp.maat, klasse = inp.klasse;
+const plantgoed = (TARIEF[maat] && TARIEF[maat][klasse-1]) || 0;
+const btwPlantgoed = plantgoed*BTW_LAAG;
+const installatie = INSTALL[maat] || 0;
+const btwInstallatie = installatie*BTW_HOOG;
+const kostenAanplant = plantgoed+btwPlantgoed+installatie+btwInstallatie;
+const subtotaalGarantie = kostenAanplant*GARANTIE;
+const totaalAanplantRente = subtotaalGarantie*RENTE_AANPLANT;
+const nazorgPerJaar = NAZORG[maat] || 0;
+const btwNazorg = nazorgPerJaar*BTW_HOOG;
+const nazorgBasis = nazorgPerJaar+btwNazorg;
+const nazorgTotaal = nazorgBasis*RENTE_NAZORG;
+const boomwaardeBijAanplant = totaalAanplantRente + nazorgTotaal;
+const beheerPerJaar = BEHEER[maat] || 0;
+const N = (inp.leeftijdFV||0) - NAZORGJAREN;
+const g2n = g2factor(N);
+const g1n = g1factor(N);
+const beheerkostenTotFV = g2n*beheerPerJaar;
+const boomwaardeMetRenteTotFV = boomwaardeBijAanplant*g1n;
+const boomwaardeBijFV = beheerkostenTotFV + boomwaardeMetRenteTotFV;
+const functioneleOuderdom = (inp.leeftijdNu||0) - (inp.leeftijdFV||0);
+const levensduurNaFV = (inp.maxLevensverwachting||0) - (inp.leeftijdFV||0);
+const afschrijvingsfactor = levensduurNaFV>0 ? Math.min(1,(functioneleOuderdom*functioneleOuderdom)/(levensduurNaFV*levensduurNaFV)) : 0;
+const actueleBoomwaarde = Math.max(0, boomwaardeBijFV*(1-afschrijvingsfactor));
+return {plantgoed,btwPlantgoed,installatie,btwInstallatie,kostenAanplant,subtotaalGarantie,totaalAanplantRente,
+nazorgPerJaar,btwNazorg,nazorgTotaal,boomwaardeBijAanplant,beheerPerJaar,N,g2n,g1n,beheerkostenTotFV,
+boomwaardeMetRenteTotFV,boomwaardeBijFV,functioneleOuderdom,levensduurNaFV,afschrijvingsfactor,actueleBoomwaarde};
+}
+function berekenSchade(actueleBoomwaarde, inp){
+let basis = actueleBoomwaarde, stap1 = null;
+if(inp.schadeType==="D1"){
+const p = (inp.d1Pct||0)/100;
+const schade = actueleBoomwaarde*p;
+basis = actueleBoomwaarde - schade;
+stap1 = {type:t('res_schade_d1'), pct:p, schade, resterend:basis};
+} else if(inp.schadeType==="D2"){
+const p = (inp.d2Pct||0)/100;
+const schade = actueleBoomwaarde*p;
+basis = actueleBoomwaarde - schade;
+stap1 = {type:t('res_schade_d2'), pct:p, schade, resterend:basis};
+}
+let stap2 = null;
+if(inp.d3Toggle){
+const totaal = Math.min(1, ((inp.d3Stam||0)+(inp.d3Wortel||0)+(inp.d3Kroon||0))/100);
+const schade = basis*totaal;
+const resterend = basis-schade;
+stap2 = {stam:inp.d3Stam||0, wortel:inp.d3Wortel||0, kroon:inp.d3Kroon||0, totaalPct:totaal, schade, resterend};
+basis = resterend;
+}
+const extraTotaal = (inp.extra||[]).reduce((s,r)=> s + (parseFloat(r.bedrag)||0), 0);
+const totaleSchade = (actueleBoomwaarde - basis) + extraTotaal;
+return {stap1, stap2, resterendeBoomwaarde: basis, extraTotaal, totaleSchade};
+}
+/* ===== UI: stepper, panes ===== */
+const STEP_LABELS_KEYS=["s1_h","s2_h","s3_h","s4_h","res_rapport_titel"];
+let currentStep=1;
+function renderStepper(){
+const el=document.getElementById('stepperBar'); el.innerHTML='';
+STEP_LABELS_KEYS.forEach((k,i)=>{
+const s=document.createElement('span'); s.textContent=(i+1)+". "+t(k).replace(/^\d+\s*\u00b7\s*/,'');
+if(i+1===currentStep) s.className='on';
+el.appendChild(s);
+if(i<STEP_LABELS_KEYS.length-1){ const sep=document.createElement('span'); sep.textContent=' \u203a '; el.appendChild(sep); }
+});
+}
+function gotoStep(n){
+currentStep=n;
+for(let i=1;i<=5;i++){ document.getElementById('pane-'+i).style.display = (i===n)?'block':'none'; }
+renderStepper();
+if(n===2) renderBreakdown();
+if(n===4 && gpsCoord) setTimeout(showMap, 50);
+if(n===5) renderResultaat();
+window.scrollTo({top:0,behavior:'smooth'});
+}
+function collectInput(){
+return {
+soort: state.soort,
+klasse: parseInt(document.getElementById('klasseSelect').value)||state.klasse,
+maat: document.getElementById('maatSelect').value,
+maxLevensverwachting: parseFloat(document.getElementById('maxLevensverwachting').value)||0,
+leeftijdFV: parseFloat(document.getElementById('leeftijdFV').value)||0,
+leeftijdNu: parseFloat(document.getElementById('leeftijdNu').value)||0,
+schadeType: document.getElementById('schadeType').value,
+d1Pct: parseFloat(document.getElementById('d1Pct').value)||0,
+d2Pct: parseFloat(document.getElementById('d2Pct').value)||0,
+d3Toggle: document.getElementById('d3Toggle').checked,
+d3Stam: parseFloat(document.getElementById('d3Stam').value)||0,
+d3Wortel: parseFloat(document.getElementById('d3Wortel').value)||0,
+d3Kroon: parseFloat(document.getElementById('d3Kroon').value)||0,
+extra: collectExtraItems(),
+dossierNr: document.getElementById('dossierNr').value,
+dossierDatum: document.getElementById('dossierDatum').value,
+dossierLocatie: document.getElementById('dossierLocatie').value,
+dossierOorzaak: document.getElementById('dossierOorzaak').value
+};
+}
+function breakdownRows(r, inp){
+return [
+[t('bd_plantgoed',{maat:inp.maat,klasse:inp.klasse}), fmt(r.plantgoed), ""],
+[t('bd_btw6'), fmt(r.btwPlantgoed), "sub"],
+[t('bd_aanplant'), fmt(r.installatie), ""],
+[t('bd_btw19'), fmt(r.btwInstallatie), "sub"],
+[t('bd_kostenaanplant'), fmt(r.kostenAanplant), "sub"],
+[t('bd_garantie'), fmt(r.subtotaalGarantie), "sub"],
+[t('bd_rentenazorg'), fmt(r.totaalAanplantRente), "sub"],
+[t('bd_nazorgtotaal'), fmt(r.nazorgTotaal), ""],
+[t('bd_boomwaardeaanplant'), fmt(r.boomwaardeBijAanplant), "total"],
+[t('bd_beheerperjaar'), fmt(r.beheerPerJaar), "sub"],
+[t('bd_rentejaren'), r.N, "sub"],
+[t('bd_beheertotfv',{f:(Math.round(r.g2n*100)/100)}), fmt(r.beheerkostenTotFV), "sub"],
+[t('bd_boomwaarderente',{f:(Math.round(r.g1n*100)/100)}), fmt(r.boomwaardeMetRenteTotFV), "sub"],
+[t('bd_boomwaardefv'), fmt(r.boomwaardeBijFV), "total"],
+[t('bd_functieouderdom'), r.functioneleOuderdom, "sub"],
+[t('bd_resterendelevensduur'), r.levensduurNaFV, "sub"],
+[t('bd_afschrijvingsfactor'), pct(r.afschrijvingsfactor), "sub"],
+[t('bd_actueleboomwaarde'), fmt(r.actueleBoomwaarde), "total"]
+];
+}
+function rowsToTable(rows){
+let html = '<table class="calc">';
+rows.forEach(row=>{ html += '<tr class="'+row[2]+'"><td>'+row[0]+'</td><td>'+row[1]+'</td></tr>'; });
+return html + '</table>';
+}
+function renderBreakdown(){
+const inp = collectInput();
+const r = berekenBoomwaarde(inp);
+document.getElementById('berekeningBreakdown').innerHTML = rowsToTable(breakdownRows(r, inp));
+return r;
+}
+function initD1Chips(){
+const wrap = document.getElementById('d1Chips');
+const chips = [['chip1',20],['chip2',25],['chip3',50],['chip4',75]];
+chips.forEach(c=>{
+const b=document.createElement('div'); b.className='chip'; b.textContent=t(c[0]);
+b.onclick=()=>{ document.getElementById('d1Pct').value=c[1]; [...wrap.children].forEach(x=>x.classList.remove('active')); b.classList.add('active'); };
+wrap.appendChild(b);
+});
+}
+function updateSchadeVisibility(){
+const tp = document.getElementById('schadeType').value;
+document.getElementById('d1Block').style.display = tp==='D1' ? 'block':'none';
+document.getElementById('d2Block').style.display = tp==='D2' ? 'block':'none';
+}
+function updateD3Visibility(){
+const on = document.getElementById('d3Toggle').checked;
+document.getElementById('d3Block').style.display = on ? 'block':'none';
+if(on) updateD3Total();
+}
+function updateD3Total(){
+const s=parseFloat(document.getElementById('d3Stam').value)||0;
+const w=parseFloat(document.getElementById('d3Wortel').value)||0;
+const k=parseFloat(document.getElementById('d3Kroon').value)||0;
+const tt = Math.min(100, s+w+k);
+document.getElementById('d3Totaal').textContent = t('d3_totaal') + " " + tt.toLocaleString(LANG==='it'?'it-IT':'nl-NL') + "%" + (s+w+k>100?t('d3_afgetopt'):"");
+}
+/* ===== Extra kosten regels ===== */
+function addExtraItem(desc, bedrag){
+extraItems.push({desc:desc||"", bedrag:bedrag||""});
+renderExtraItems();
+}
+function removeExtraItem(i){ extraItems.splice(i,1); renderExtraItems(); }
+function renderExtraItems(){
+const wrap = document.getElementById('extraItems'); wrap.innerHTML='';
+extraItems.forEach((it,i)=>{
+const row=document.createElement('div'); row.className='itemrow';
+row.innerHTML = '<input type="text" placeholder="'+ (LANG==='it'?'descrizione':'omschrijving') +'" value="'+(it.desc||'').replace(/"/g,'&quot;')+'" data-i="'+i+'" data-f="desc">'+
+'<input type="number" placeholder="\u20ac" value="'+(it.bedrag||'')+'" data-i="'+i+'" data-f="bedrag">'+
+'<button class="btn danger small" data-i="'+i+'">\u2715</button>';
+wrap.appendChild(row);
+});
+wrap.querySelectorAll('input').forEach(inp=>{
+inp.addEventListener('input', (e)=>{ const i=+e.target.dataset.i, f=e.target.dataset.f; extraItems[i][f]=e.target.value; });
+});
+wrap.querySelectorAll('button').forEach(b=>{ b.addEventListener('click',(e)=>{ removeExtraItem(+e.target.dataset.i); }); });
+}
+function collectExtraItems(){ return extraItems.filter(it=>it.desc||it.bedrag); }
+/* ===== Resultaat / rapport ===== */
+function renderResultaat(){
+const inp = collectInput();
+const r = berekenBoomwaarde(inp);
+const s = berekenSchade(r.actueleBoomwaarde, inp);
+const datum = new Date().toLocaleDateString(LANG==='it'?'it-IT':'nl-NL');
+let html = '';
+html += '<div class="printonly"><h1>'+t('res_rapport_titel')+'</h1>';
+html += '<p>'+t('res_datum')+': '+datum+' \u00b7 '+t('res_dossier')+': '+(inp.dossierNr||'\u2014')+' \u00b7 '+t('res_schadedatum')+': '+(inp.dossierDatum||'\u2014')+'</p>';
+html += '<p>'+t('res_locatie')+': '+(inp.dossierLocatie||'\u2014')+' \u00b7 '+t('res_oorzaak')+': '+(inp.dossierOorzaak||'\u2014')+'</p>';
+if(gpsCoord) html += '<p>'+t('res_gps')+': '+gpsCoord.lat.toFixed(6)+', '+gpsCoord.lon.toFixed(6)+'</p>';
+html += '<p>'+t('res_soort')+': <strong>'+(inp.soort||t('res_niet_gekozen'))+'</strong> \u00b7 '+t('res_klasse')+' '+inp.klasse+' \u00b7 '+t('res_maat')+' '+inp.maat+'</p></div>';
+html += '<div class="result"><h2 style="color:inherit">'+t('res_rapport_titel')+'</h2>';
+html += '<p>'+t('res_actueleboomwaarde')+': <strong>'+fmt(r.actueleBoomwaarde)+'</strong></p>';
+html += '<div class="big">'+fmt(s.totaleSchade)+'</div><p>'+t('res_totaleschade_label')+'</p>';
+html += '<table class="calc" style="margin-top:10px">';
+html += '<tr><td>'+t('res_actueleboomwaarde')+'</td><td>'+fmt(r.actueleBoomwaarde)+'</td></tr>';
+if(s.stap1) html += '<tr><td>'+s.stap1.type+' ('+pct(s.stap1.pct)+')</td><td>-'+fmt(s.stap1.schade)+'</td></tr>';
+if(s.stap2) html += '<tr><td>'+t('res_schade_d3')+' ('+pct(s.stap2.totaalPct)+': '+t('res_stam')+' '+s.stap2.stam+'% \u00b7 '+t('res_wortel')+' '+s.stap2.wortel+'% \u00b7 '+t('res_kroon')+' '+s.stap2.kroon+'%)</td><td>-'+fmt(s.stap2.schade)+'</td></tr>';
+html += '<tr class="sub"><td>'+t('res_resterende')+'</td><td>'+fmt(s.resterendeBoomwaarde)+'</td></tr>';
+if(s.extraTotaal) html += '<tr><td>'+t('res_overige')+'</td><td>'+fmt(s.extraTotaal)+'</td></tr>';
+html += '<tr class="total"><td>'+t('res_totaal')+'</td><td>'+fmt(s.totaleSchade)+'</td></tr>';
+html += '</table></div>';
+if(gpsCoord){
+html += '<div class="panel" style="margin-top:14px"><h2>'+t('res_locatie')+'</h2><div id="resultMapSlot" style="height:220px;border-radius:8px;overflow:hidden;border:1px solid var(--line)"></div></div>';
+}
+if((inp.extra||[]).length){
+html += '<div class="panel" style="margin-top:14px"><h2>'+t('res_overige_detail_h')+'</h2><table class="calc">';
+inp.extra.forEach(it=>{ html+='<tr><td>'+(it.desc||'\u2014')+'</td><td>'+fmt(parseFloat(it.bedrag)||0)+'</td></tr>'; });
+html += '</table></div>';
+}
+html += '<div class="panel" style="margin-top:14px"><h2>'+t('res_onderbouwing_h')+'</h2><div id="breakdownSlot"></div></div>';
+document.getElementById('resultaatBox').innerHTML = html;
+document.getElementById('breakdownSlot').appendChild(buildBreakdownTable(r, inp));
+if(gpsCoord && document.getElementById('resultMapSlot')){
+try{
+const m = L.map('resultMapSlot', {zoomControl:false, dragging:false, scrollWheelZoom:false}).setView([gpsCoord.lat, gpsCoord.lon], 17);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19}).addTo(m);
+L.marker([gpsCoord.lat, gpsCoord.lon]).addTo(m);
+setTimeout(()=>m.invalidateSize(), 200);
+}catch(e){}
+}
+const box = document.getElementById('resultaatBox');
+const foot = document.createElement('p');
+foot.className='printonly';
+foot.style.marginTop='20px';
+foot.textContent = t('res_footer');
+box.appendChild(foot);
+saveState();
+}
+function buildBreakdownTable(r, inp){
+const div=document.createElement('div');
+div.innerHTML = rowsToTable(breakdownRows(r, inp));
+return div;
+}
+function recalcAll(){
+if(document.getElementById('pane-2') && document.getElementById('pane-2').style.display!=='none') renderBreakdown();
+}
+/* ===== Tarieven tab (incl. bewerkmodus) ===== */
+function renderTarievenTab(){
+const noteEl = document.getElementById('tarOverrideNote');
+if(noteEl) noteEl.textContent = tariefOverrideDatum ? t('tar_override_note',{datum:tariefOverrideDatum}) : '';
+if(tarEditMode){ renderTariefTableEdit(); renderKostenTableEdit(); }
+else {
+let tt = '<tr><th>'+t('tar_maat')+'</th><th>'+t('klasse1')+'</th><th>'+t('klasse2')+'</th><th>'+t('klasse3')+'</th><th>'+t('klasse4')+'</th></tr>';
+MATEN.forEach(m=>{ const v=TARIEF[m]; tt+='<tr><td>'+m+'</td><td>'+fmt(v[0])+'</td><td>'+fmt(v[1])+'</td><td>'+fmt(v[2])+'</td><td>'+fmt(v[3])+'</td></tr>'; });
+document.getElementById('tariefTable').innerHTML = tt;
+let k = '<tr><th>'+t('tar_maat')+'</th><th>'+t('tar_aanplant')+'</th><th>'+t('tar_nazorg')+'</th><th>'+t('tar_beheer')+'</th></tr>';
+MATEN.forEach(m=>{ k+='<tr><td>'+m+'</td><td>'+fmt(INSTALL[m])+'</td><td>'+fmt(NAZORG[m])+'</td><td>'+fmt(BEHEER[m])+'</td></tr>'; });
+document.getElementById('kostenTable').innerHTML = k;
+}
+document.getElementById('tarEditButtons').style.display = tarEditMode ? 'block':'none';
+document.getElementById('editTariefBtn').style.display = tarEditMode ? 'none':'inline-block';
+const ug = document.getElementById('uitgangspuntenTable');
+if(ug) ug.innerHTML =
+'<tr><td>'+t('ug_btwplant')+'</td><td>6%</td></tr>'+
+'<tr><td>'+t('ug_btwarbeid')+'</td><td>19%</td></tr>'+
+'<tr><td>'+t('ug_garantie')+'</td><td>10%</td></tr>'+
+'<tr><td>'+t('ug_rente1')+'</td><td>\u00d71,12</td></tr>'+
+'<tr><td>'+t('ug_rente2')+'</td><td>\u00d73,12</td></tr>'+
+'<tr><td>'+t('ug_rekenrente')+'</td><td>'+t('ug_rekenrente_v')+'</td></tr>'+
+'<tr><td>'+t('ug_soorten')+'</td><td>'+t('ug_soorten_v')+'</td></tr>';
+let s = '<tr><th>'+t('tar_soort')+'</th><th>'+t('tar_klasse')+'</th></tr>';
+SOORTEN.forEach(sp=>{ s+='<tr><td>'+sp[0]+(sp[2]?' <span class="badge">'+t('tar_naaldboom')+'</span>':'')+'</td><td>'+sp[1]+'</td></tr>'; });
+document.getElementById('soortenTable').innerHTML = s;
+}
+function renderTariefTableEdit(){
+let tt = '<tr><th>'+t('tar_maat')+'</th><th>'+t('klasse1')+'</th><th>'+t('klasse2')+'</th><th>'+t('klasse3')+'</th><th>'+t('klasse4')+'</th></tr>';
+MATEN.forEach(m=>{
+const v=TARIEF[m];
+tt+='<tr><td>'+m+'</td>'+v.map((val,ci)=>'<td><input type="number" min="0" step="1" value="'+val+'" data-maat="'+m+'" data-klasse="'+ci+'"></td>').join('')+'</tr>';
+});
+document.getElementById('tariefTable').innerHTML = tt;
+document.querySelectorAll('#tariefTable input').forEach(inp=>{
+inp.addEventListener('input', (e)=>{
+const m = e.target.dataset.maat, ci = parseInt(e.target.dataset.klasse);
+TARIEF[m][ci] = parseFloat(e.target.value)||0;
+});
+});
+}
+function renderKostenTableEdit(){
+let k = '<tr><th>'+t('tar_maat')+'</th><th>'+t('tar_aanplant')+'</th><th>'+t('tar_nazorg')+'</th><th>'+t('tar_beheer')+'</th></tr>';
+MATEN.forEach(m=>{
+k+='<tr><td>'+m+'</td>'+
+'<td><input type="number" min="0" step="1" value="'+INSTALL[m]+'" data-maat="'+m+'" data-veld="INSTALL"></td>'+
+'<td><input type="number" min="0" step="0.5" value="'+NAZORG[m]+'" data-maat="'+m+'" data-veld="NAZORG"></td>'+
+'<td><input type="number" min="0" step="0.5" value="'+BEHEER[m]+'" data-maat="'+m+'" data-veld="BEHEER"></td></tr>';
+});
+document.getElementById('kostenTable').innerHTML = k;
+document.querySelectorAll('#kostenTable input').forEach(inp=>{
+inp.addEventListener('input', (e)=>{
+const m = e.target.dataset.maat, veld = e.target.dataset.veld;
+const val = parseFloat(e.target.value)||0;
+if(veld==='INSTALL') INSTALL[m]=val; else if(veld==='NAZORG') NAZORG[m]=val; else if(veld==='BEHEER') BEHEER[m]=val;
+});
+});
+}
+function initTariefEdit(){
+document.getElementById('editTariefBtn').addEventListener('click', ()=>{ tarEditMode=true; renderTarievenTab(); });
+document.getElementById('saveTariefBtn').addEventListener('click', ()=>{
+saveTariefOverrides(); tarEditMode=false; renderTarievenTab();
+alert(t('tar_saved_ok'));
+});
+document.getElementById('resetTariefBtn').addEventListener('click', ()=>{
+if(confirm(t('tar_confirm_reset'))){ resetTarieven(); tarEditMode=false; renderTarievenTab(); }
+});
+}
+/* ===== Tabs ===== */
+function initTabs(){
+document.querySelectorAll('nav.tabs button').forEach(btn=>{
+btn.addEventListener('click', ()=>{
+document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+btn.classList.add('active');
+document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+document.getElementById('view-'+btn.dataset.tab).classList.add('active');
+});
+});
+document.querySelectorAll('.langtoggle button').forEach(b=>{
+b.addEventListener('click', ()=> setLang(b.dataset.lang));
+});
+}
+/* ===== Init ===== */
+document.addEventListener('DOMContentLoaded', ()=>{
+const y = document.getElementById('bwYear'); if(y) y.textContent = new Date().getFullYear();
+loadState();
+loadTariefOverrides();
+initTabs();
+initSoortPicker();
+initD1Chips();
+initGPS();
+initTariefEdit();
+renderExtraItems();
+applyI18n();
+document.getElementById('schadeType').addEventListener('change', updateSchadeVisibility);
+document.getElementById('d3Toggle').addEventListener('change', updateD3Visibility);
+['d3Stam','d3Wortel','d3Kroon'].forEach(id=>document.getElementById(id).addEventListener('input', updateD3Total));
+['maxLevensverwachting','leeftijdFV','leeftijdNu'].forEach(id=>document.getElementById(id).addEventListener('input', renderBreakdown));
+gotoStep(1);
+renderStepper();
+});
+</script></body>
+</html>
