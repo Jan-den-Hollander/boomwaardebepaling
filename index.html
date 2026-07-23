@@ -760,6 +760,29 @@ document.querySelectorAll('.langtoggle button').forEach(b=>{
 b.addEventListener('click', ()=> setLang(b.dataset.lang));
 });
 }
+/* ===== Integriteitscontrole (copyright-bescherming) ===== */
+function blockApp(){
+  if(document.getElementById('bwBlockOverlay')) return;
+  const ov = document.createElement('div');
+  ov.id = 'bwBlockOverlay';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#161a15;color:#eef0e8;display:flex;align-items:center;justify-content:center;text-align:center;padding:30px;font-family:sans-serif;';
+  ov.innerHTML = '<div style="max-width:420px">' +
+    '<h2 style="color:#c7943f;font-family:sans-serif;margin-bottom:10px">Integriteitscontrole mislukt</h2>' +
+    '<p style="font-size:13px;line-height:1.6;color:#c8d0c0">Deze app is op een manier gewijzigd die niet is toegestaan — de copyright-vermelding ontbreekt of is aangepast. Deze tool is gratis, maar uitsluitend ongewijzigd en niet-commercieel te gebruiken.</p>' +
+    '<p style="font-size:12px;margin-top:14px;color:#8fae5c">© Jan den Hollander — jandenhollander@duck.com</p>' +
+    '</div>';
+  document.body.appendChild(ov);
+}
+function checkIntegrity(){
+  const footer = document.getElementById('bwCopyFooter');
+  if(!footer || !footer.textContent.includes('Jan den Hollander') || !footer.textContent.includes('Boomwaarde')){
+    blockApp();
+  }
+}
+const integrityObserver = new MutationObserver(()=>{ checkIntegrity(); });
+integrityObserver.observe(document.body, {childList:true, subtree:true, characterData:true});
+setInterval(checkIntegrity, 4000);
+checkIntegrity();
 /* ===== Init ===== */
 document.addEventListener('DOMContentLoaded', ()=>{
 const y = document.getElementById('bwYear'); if(y) y.textContent = new Date().getFullYear();
